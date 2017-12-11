@@ -1,3 +1,17 @@
+PureFtpd inside docker container
 Usage:
+
 vagrant up
-vagrant halt
+
+ftp <guest_machine1_ip>
+ftp <guest_machine2_ip>
+
+Login/Password: ftpuser/ftpuser
+
+rpm package location:
+
+/home/mock/rpmbuild/RPMS/x86_64/pure-ftpd-1.0.47-1.el6.x86_64.rpm
+
+pureftpd starts each time by this command from Dockerfile:
+
+if [ -f /usr/sbin/pure-ftpd ]; then  /usr/sbin/pure-ftpd /etc/pure-ftpd.conf ; /usr/sbin/sshd -e -D  ;  else /usr/sbin/sshd -e -D ; fi
