@@ -1,6 +1,12 @@
 FROM centos:6.9
 
-RUN /usr/bin/yum update -y  && /usr/bin/yum install openssh-server -y && /usr/bin/yum install openssh-clients -y
+RUN /usr/bin/yum update -y
+RUN /usr/bin/yum install openssh-server -y
+RUN /usr/bin/yum install openssh-clients -y
+RUN /usr/bin/yum install sudo -y
+#RUN /usr/bin/yum install wget -y
+#RUN /usr/bin/yum install gcc.x86_64 -y
+#RUN /usr/bin/yum install rpm-build -y
 RUN mkdir /var/run/sshd
 RUN sed -i 's/#PermitRootLogin yes/PermitRootLogin yes/' /etc/ssh/sshd_config
 RUN sed -i 's/#RSAAuthentication yes/RSAAuthentication yes/' /etc/ssh/sshd_config
@@ -17,7 +23,11 @@ RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so
 
 ENV NOTVISIBLE "in users profile"
 RUN echo "export VISIBLE=now" >> /etc/profile
+RUN echo -e "#!/bin/bash\nif [ -f /usr/sbin/pure-ftpd ]; then  /usr/sbin/pure-ftpd /etc/pure-ftpd.conf ; /usr/sbin/sshd -e -D  ;  else /usr/sbin/sshd -e -D ; fi" > /var/up.sh
+RUN chmod +x /var/up.sh
 
 
 EXPOSE 22
-CMD ["/usr/sbin/sshd","-e","-D"]
+EXPOSE 21
+CMD ["/var/up.sh"]
+#CMD ["/usr/sbin/sshd","-e","-D"]

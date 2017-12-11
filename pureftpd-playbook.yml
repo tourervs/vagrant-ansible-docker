@@ -1,0 +1,131 @@
+- hosts: 127.0.0.1
+  tasks:
+    - name: install_packages 
+      yum:
+        name:
+        - gcc.x86_64 
+        - wget
+        - rpm-build
+        state: installed
+    - name: create_build_user
+      user:
+        name: mock
+        createhome: yes
+    - name: check_mock_home_dir
+      file: 
+        path: /home/mock 
+        state: directory
+        owner: mock
+        group: mock 
+    - name: make_rpmbuild_dir
+      file: 
+        path: /home/mock/rpmbuild 
+        state: directory
+        owner: mock
+        group: mock
+    - name: make_rpmbuild_dirs
+      file: 
+        path: /home/mock/rpmbuild/{{item}}
+        state: directory
+        owner: mock
+        group: mock
+      with_items:
+        - 'BUILD'
+        - 'BUILDROOT'
+        - 'RPMS'
+        - 'SOURCES'
+        - 'SPECS'
+        - 'SRPMS'
+    - name: download_src
+      get_url:
+        url: https://download.pureftpd.org/pub/pure-ftpd/releases/pure-ftpd-1.0.47.tar.gz
+        dest: /home/mock/rpmbuild/SOURCES/pure-ftpd-1.0.47.tar.gz 
+        validate_certs: no
+    - name: make_spec
+      file: 
+        path: /home/mock/rpmbuild/SPECS/pure-ftpd-1.0.47.spec 
+        state: touch
+        owner: mock
+        group: mock
+    - name: put_spec_content 
+      copy:
+        content: |
+          Name:           pure-ftpd
+          Version:        1.0.47
+          Release:        1%{?dist}
+          Summary:        Pure-FTPd is a free (BSD), secure, production-quality and standard-conformant FTP server.
+
+          License:        Free software (BSD License)
+          URL:            https://www.pureftpd.org/
+          Source0:        pure-ftpd-1.0.47.tar.gz
+
+          Requires(post): info
+          Requires(preun): info
+
+          %description
+          Pure-FTPd is a free (BSD), secure, production-quality and standard-conformant FTP server.
+          %prep
+          %setup
+          %build
+          ./configure --prefix=/usr --with-puredb
+          make PREFIX=/usr %{?_smp_mflags}
+          %install
+          make PREFIX=/usr DESTDIR=%{?buildroot} install
+
+          %clean
+          rm -rf %{buildroot}
+
+          %files
+          %{_bindir}/pure-statsdecode
+          %{_bindir}/pure-pwconvert
+          %{_bindir}/pure-pw
+          %{_sbindir}/pure-authd
+          %{_sbindir}/pure-ftpd
+          %{_sbindir}/pure-ftpwho
+          %{_sbindir}/pure-mrtginfo
+          %{_sbindir}/pure-quotacheck
+          %{_sbindir}/pure-uploadscript
+          %{_sysconfdir}/pure-ftpd.conf
+          %{_mandir}/man8/*
+
+        dest: /home/mock/rpmbuild/SPECS/pure-ftpd-1.0.47.spec
+    - name: build_package
+      command: rpmbuild -ba /home/mock/rpmbuild/SPECS/pure-ftpd-1.0.47.spec
+      become: true
+      become_user: mock
+    - name: install_package
+      command: rpm -ivh /home/mock/rpmbuild/RPMS/x86_64/pure-ftpd-1.0.47-1.el6.x86_64.rpm
+    - name: disable_daemonize
+      lineinfile:
+        path: /etc/pure-ftpd.conf
+        regexp: '^Daemonize'
+        line: 'Daemonize                    yes'
+    - name: enable_puredb
+      lineinfile:
+        path: /etc/pure-ftpd.conf
+        regexp: '^PureDB'
+        line: 'PureDB                    /etc/pureftpd.pdb'
+    - name: enable_autocreate_of_homedirectory
+      lineinfile:
+        path: /etc/pure-ftpd.conf
+        regexp: '^CreateHomeDir'
+        line: 'CreateHomeDir                yes'
+    - name: create_ftpusers
+      user:
+        name: ftpusers
+        createhome: yes
+        shell: /sbin/nologin
+    - name: create_pureftpd_passwd
+      file:
+        path: /etc/pureftpd.passwd
+        state: touch
+        owner: root
+        group: root
+        mode: 0600
+    - name: make_pure_passwd
+      command: pure-pw mkdb -f /etc/pureftpd.passwd
+    - name: make_pure_db 
+      command: pure-pw mkdb /etc/pureftpd.pdb
+    - name: create_new_pureftpd_user
+      shell: "echo -e  \"ftpuser\nftpuser\" | pure-pw useradd ftpuser -u ftpusers -d /home/ftpusers/ftpuser -m -f /etc/pureftpd.passwd -F /etc/pureftpd.pdb"
+
